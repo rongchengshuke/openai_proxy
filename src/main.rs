@@ -124,9 +124,8 @@ async fn handler(req: Request<IncomingBody>) -> Result<Response<IncomingBody>> {
         api_key,
     ).await?;
 
-    println!("Response: {:?}", res);
     res.headers().iter().for_each(|(name, value)| {
-        println!("{}: {}", name.as_str(), value.to_str().unwrap());
+        println!("res {}: {}", name.as_str(), value.to_str().unwrap());
     });
 
     return Ok(res)
