@@ -58,6 +58,8 @@ use http_body_util::combinators::BoxBody;
 
 async fn request(
         url: String,
+        method: Method,
+        headers: hyper::HeaderMap,
         req_data: Full<Bytes>,
         api_key: String,
     ) ->  Result<Response<IncomingBody>> {
@@ -66,6 +68,7 @@ async fn request(
 
     let authority = uri.authority().unwrap().clone();
 
+    let content_type = headers.get("content-type").unwrap().to_str().unwrap();
 
     //let auth_header_val = format!("Bearer {}", api_key);
     let auth_header_val = format!("{}", api_key);
@@ -76,18 +79,18 @@ async fn request(
     let client = Client::builder(TokioExecutor::new()).build::<_, BodyStream<Full<Bytes>>>(https);
 
     let req = Request::builder()
-        .method(Method::POST)
+        .method(method)
         .uri(url)
         .header(hyper::header::HOST, authority.as_str())
-        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CONTENT_TYPE, content_type)
         .header("Authorization", &auth_header_val)
         .body(body)
         .unwrap()
         ;
 
-    println!("Request proxy: {:?}", req);
+    //println!("Request proxy: {:?}", req);
     req.headers().iter().for_each(|(name, value)| {
-        println!("{}: {}", name.as_str(), value.to_str().unwrap());
+        println!("new req: {}: {}", name.as_str(), value.to_str().unwrap());
     });
 
     let res = client.request(req).await?;
@@ -96,9 +99,9 @@ async fn request(
 
 async fn handler(req: Request<IncomingBody>) -> Result<Response<IncomingBody>> {
 
-    println!("Request Raw: {:?}", req);
+    //println!("Request Raw: {:?}", req);
     req.headers().iter().for_each(|(name, value)| {
-        println!("{}: {}", name.as_str(), value.to_str().unwrap());
+        println!("raw req: {}: {}", name.as_str(), value.to_str().unwrap());
     });
 
     let api_key = req.headers().get("Authorization").unwrap().to_str().unwrap().to_string();
@@ -106,12 +109,17 @@ async fn handler(req: Request<IncomingBody>) -> Result<Response<IncomingBody>> {
     let uri_path = req.uri().path();
 
     let uri = format!("https://api.openai.com/{}", uri_path).to_string();
+
+    let method = req.method().clone();
+    let headers = req.headers().clone();
     
     let whole_body = req.into_body().collect().await?.to_bytes();
     let full_body = Full::new(whole_body);
 
     let res = request(
         uri,
+        method,
+        headers,
         full_body,
         api_key,
     ).await?;
